@@ -158,6 +158,28 @@
       <artifactId>RoaringBitmap</artifactId>
       <version>0.7.36</version>
     </dependency>
+    <!--     <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+      <version>1.3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-lang3</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency> -->
+    <dependency>
+      <groupId>com.opencsv</groupId>
+      <artifactId>opencsv</artifactId>
+      <version>4.4</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-text</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -168,8 +190,8 @@
         <artifactId>maven-dependency-plugin</artifactId>
         <configuration>
           <usedDependencies>
-            <usedDependency>org.lmdbjava:lmdbjava-native-linux-x86_64</usedDependency>
-            <usedDependency>org.lmdbjava:lmdbjava-native-windows-x86_64</usedDependency>
+            <!-- <usedDependency>org.lmdbjava:lmdbjava-native-linux-x86_64</usedDependency> -->
+            <!-- <usedDependency>org.lmdbjava:lmdbjava-native-windows-x86_64</usedDependency> -->
             <usedDependency>org.lmdbjava:lmdbjava-native-osx-x86_64</usedDependency>
           </usedDependencies>
           <ignoredDependencies>
@@ -203,14 +225,14 @@
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
       </plugin> -->
-      <plugin>
+<!--       <plugin>
         <groupId>au.com.acegi</groupId>
         <artifactId>xml-format-maven-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>license-maven-plugin</artifactId>
-      </plugin>
+      </plugin> -->
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <executions>
@@ -223,8 +245,8 @@
             <configuration>
               <artifactSet>
                 <includes>
-                  <include>org.lmdbjava:lmdbjava-native-linux-x86_64</include>
-                  <include>org.lmdbjava:lmdbjava-native-windows-x86_64</include>
+                  <!-- <include>org.lmdbjava:lmdbjava-native-linux-x86_64</include> -->
+                  <!-- <include>org.lmdbjava:lmdbjava-native-windows-x86_64</include> -->
                   <include>org.lmdbjava:lmdbjava-native-osx-x86_64</include>
                 </includes>
               </artifactSet>

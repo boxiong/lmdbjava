@@ -64,7 +64,7 @@ import static org.lmdbjava.SeekOp.MDB_PREV;
  * need to install the LMDB system library yourself. 32-bit platforms are not
  * supported.
  */
-public final class BxTest {
+public final class BxLmdbTest {
 
   private static final String DB_NAME = "my DB";
   @Rule

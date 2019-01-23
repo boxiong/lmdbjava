@@ -1,0 +1,24 @@
+namespace org.lmdbjava.routes;
+
+enum PickupCapability:byte { PickupSupported = 0, PickupOnly, PickupNotSupported = 2 }
+
+table LegInfo {
+  sourceNode:string;
+  shipMethodName:string;
+}
+
+table RouteInfo {
+  routeId:int;
+  routeOrigin:string;
+  routeAlias:string;
+  pickupCapability:PickupCapability = PickupNotSupported;
+  validLastLegSortCodes:[string];
+  legNodes:[string];
+  legs:[LegInfo];
+}
+
+table Routes {
+  routes:[RouteInfo];
+}
+
+root_type Routes;
