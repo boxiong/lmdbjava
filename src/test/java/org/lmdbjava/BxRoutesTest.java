@@ -54,6 +54,8 @@ import static org.lmdbjava.SeekOp.MDB_PREV;
 import static org.lmdbjava.PutFlags.MDB_APPEND;
 import static org.lmdbjava.PutFlags.MDB_APPENDDUP;
 
+import io.netty.buffer.*;
+
 
 import org.lmdbjava.routes.*;
 
@@ -404,10 +406,14 @@ public class BxRoutesTest {
         final Dbi<ByteBuffer> db = env.openDbi("routesByOrigin", MDB_CREATE);
         System.out.println("bx:maxKeySize:" + env.getMaxKeySize());
 
-        final ByteBuffer key = allocateDirect(env.getMaxKeySize());
-        key.put("routes.1".getBytes(StandardCharsets.UTF_8)).flip();
-        db.put(key, dataBuffer);
+        // final ByteBuffer key = allocateDirect(env.getMaxKeySize());
+        // key.put("routes.1".getBytes(StandardCharsets.UTF_8)).flip();
+        final ByteBuf key = ByteBufAllocator.DEFAULT.directBuffer(env.getMaxKeySize());
+        ByteBufUtil.writeUtf8(key, "routes.1");
 
+        db.put(key.nioBuffer(), dataBuffer);
+
+        key.release();
 
         env.close();
 
@@ -429,12 +435,16 @@ public class BxRoutesTest {
         System.out.println("bx:maxKeySize:" + env.getMaxKeySize());
         boolean sizePrefix = false;
 
-        final ByteBuffer key = allocateDirect(env.getMaxKeySize());
-        key.put("routes.1".getBytes(StandardCharsets.UTF_8)).flip();
+        // final ByteBuffer key = allocateDirect(env.getMaxKeySize());
+        // key.put("routes.1".getBytes(StandardCharsets.UTF_8)).flip();
+
+        final ByteBuf key = ByteBufAllocator.DEFAULT.directBuffer(env.getMaxKeySize());
+        ByteBufUtil.writeUtf8(key, "routes.1");
+
         ByteBuffer dataBuffer = null;
 
         try (Txn<ByteBuffer> txn = env.txnRead()) {
-            final ByteBuffer found = db.get(txn, key);
+            final ByteBuffer found = db.get(txn, key.nioBuffer());
             System.out.println("bx:found:" + found);
 
             // The fetchedVal is read-only and points to LMDB memory
@@ -457,9 +467,8 @@ public class BxRoutesTest {
             }
         }
 
- Thread.sleep(30000);
+        key.release();
         env.close();
- Thread.sleep(30000);
 
                 System.out.println("bx:dataBuffer.Long.BYTES:" + Long.BYTES);
                 System.out.println("bx:dataBuffer.Long.BYTES*2:" + Long.BYTES * 2);
@@ -470,55 +479,6 @@ public class BxRoutesTest {
 
         System.out.println("Reading flatbuffers from MDB: completed successfully");
     }
-
-
-    // @Test
-    // public void testReadValueAsFlatBuffer() throws IOException {
-
-    //     final File path = new File("/tmp/bx/routes/");
-    //     final Env<DirectBuffer> env = create(PROXY_DB)
-    //         .setMapSize(10_485_760)
-    //         .setMaxDbs(4)
-    //         .open(path);
-
-    //     final Dbi<DirectBuffer> db = env.openDbi("routesByOrigin");
-
-    //     System.out.println("bx:maxKeySize:" + env.getMaxKeySize());
-    //     boolean sizePrefix = true;
-
-    //     final ByteBuffer keyBb = allocateDirect(env.getMaxKeySize());
-    //     final MutableDirectBuffer key = new UnsafeBuffer(keyBb);
-    //     int keyLen = key.putStringWithoutLengthUtf8(0, "routes.1");
-    //     key.wrap(key, 0, keyLen);
-
-    //     try (Txn<DirectBuffer> txn = env.txnRead()) {
-    //         final DirectBuffer found = db.get(txn, key);
-    //         System.out.println("bx:found:" + found);
-
-    //         // The fetchedVal is read-only and points to LMDB memory
-    //         final DirectBuffer fetchedVal = txn.val();
-    //         System.out.println("bx:fetchedVal:" + fetchedVal);
-
-    //         // Read data back from bytebuffer
-    //         if (found != null) {
-    //             ByteBuffer dataBuffer = found.byteBuffer();
-    //             int totalSize = dataBuffer.remaining();
-    //             System.out.println("bx:dataBuffer.totalSize:" + totalSize);
-    //             System.out.println("bx:dataBuffer.isDirect:" + dataBuffer.isDirect());
-    //             System.out.println("bx:dataBuffer.position:" + dataBuffer.position());
-    //             System.out.println("bx:dataBuffer.limit:" + dataBuffer.limit());
-    //             if (sizePrefix) {
-    //                 System.out.println("bx:dataBuffer.size:" + ByteBufferUtil.getSizePrefix(dataBuffer));
-    //                 dataBuffer = ByteBufferUtil.removeSizePrefix(dataBuffer);
-    //             }
-    //             displayRoutes(dataBuffer);
-    //         }
-    //     }
-
-    //     env.close();
-
-    //     System.out.println("Reading flatbuffers from MDB: completed successfully");
-    // }
 
 
 }
