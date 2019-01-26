@@ -26,6 +26,8 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
@@ -356,7 +358,9 @@ public class BxRoutesTest {
         int numOfRoutes = root.routesLength();
         System.out.println("bx:routesLength:" + numOfRoutes);
         for (int i = 0; i < numOfRoutes; i++) {
-            displayRoute(root.routes(i));
+            if (i % 10_000 == 0) {
+              displayRoute(root.routes(i));
+            }
         }
     }
 
@@ -423,11 +427,14 @@ public class BxRoutesTest {
     @Test
     public void testReadValueAsFlatBuffer() throws IOException, InterruptedException {
 
-        final File path = new File("/tmp/bx/routes/");
+        final File path = new File("/tmp/bx/routes");
         final Env<ByteBuffer> env = create()
-            .setMapSize(10_485_760)
+            .setMapSize(2L*1024*1024*1024)  // 2GB
             .setMaxDbs(4)
             .open(path);
+
+        System.out.println("bx:env:open:" + env.info());
+        Thread.sleep(60000);
 
         final Dbi<ByteBuffer> db = env.openDbi("routesByOrigin");
 
@@ -468,7 +475,11 @@ public class BxRoutesTest {
         }
 
         key.release();
+        System.out.println("bx:env:closing:" + env.info());
+        Thread.sleep(60000);
         env.close();
+        System.out.println("bx:env:closed");
+        Thread.sleep(60000);
 
                 System.out.println("bx:dataBuffer.Long.BYTES:" + Long.BYTES);
                 System.out.println("bx:dataBuffer.Long.BYTES*2:" + Long.BYTES * 2);
@@ -480,5 +491,139 @@ public class BxRoutesTest {
         System.out.println("Reading flatbuffers from MDB: completed successfully");
     }
 
+
+    private void buildRoutesFromCsv(FlatBufferBuilder fbb, boolean sizePrefix, String csvFileName) throws IOException {
+        List<Integer> routes = new ArrayList<>();
+        // Map<Integer, int[]> routesByOrigin = new HashMap<>();
+
+        try (CSVReader csvReader = getCSVReader(csvFileName)) {
+            int i = 0;
+            while (true) {
+                i++;
+                // if (i > 500_000) {
+                //     break;
+                // }
+                String[] lineTokens = csvReader.readNext();
+                if (lineTokens == null) {
+                    break;
+                }
+
+                if (i % 10_000 == 0) {
+                    System.out.println(Arrays.toString(lineTokens));
+                }
+
+                String routeAlias = lineTokens[0];
+                String pickupCapability = lineTokens[2];
+                String originNode = lineTokens[3];
+                int nodeId = Integer.parseInt(originNode, Character.MAX_RADIX);
+
+                List<Integer> legs = new ArrayList<>();
+                for (int j = 3; j < 23; j = j + 2) {
+                    String legNode = lineTokens[j];
+                    String legMethod = lineTokens[j + 1];
+                    if (legNode == null || legNode.isEmpty() ||
+                        legMethod == null || legMethod.isEmpty()) {
+                        break;
+                    }
+
+                    int nLegNode = fbb.createString(legNode);
+                    int nLegMethod = fbb.createString(legMethod);
+
+                    LegInfo.startLegInfo(fbb);
+                    LegInfo.addSourceNode(fbb, nLegNode);
+                    LegInfo.addShipMethodName(fbb, nLegMethod);
+                    legs.add(LegInfo.endLegInfo(fbb));
+                }
+
+                int nOriginNode = fbb.createString(originNode);
+                int nRouteAlias = fbb.createString(routeAlias);
+                int nLegVector = RouteInfo.createLegNodesVector(fbb, legs.stream().mapToInt(e->e).toArray());
+                // done with adding legs for a given route
+                RouteInfo.startRouteInfo(fbb);
+                RouteInfo.addLegs(fbb, nLegVector);
+                RouteInfo.addRouteAlias(fbb, nRouteAlias);
+                RouteInfo.addRouteOrigin(fbb, nOriginNode);
+                RouteInfo.addRouteId(fbb, i);
+                if ("PICKUP_ONLY".equals(pickupCapability)) {
+                    RouteInfo.addPickupCapability(fbb, PickupCapability.PickupOnly);
+                } else if ("PICKUP_SUPPORTED".equals(pickupCapability)) {
+                    RouteInfo.addPickupCapability(fbb, PickupCapability.PickupSupported);
+                }
+                routes.add(RouteInfo.endRouteInfo(fbb));
+            }
+
+            int routeVector = Routes.createRoutesVector(fbb, routes.stream().mapToInt(e->e).toArray());
+
+            Routes.startRoutes(fbb);
+            Routes.addRoutes(fbb, routeVector);
+            int root = Routes.endRoutes(fbb);
+
+            if (sizePrefix) {
+                Routes.finishSizePrefixedRoutesBuffer(fbb, root);
+            } else {
+                Routes.finishRoutesBuffer(fbb, root);
+            }
+        }
+    }
+
+    // @Test
+    public void testWriteRoutesAsFlatBuffer() throws IOException {
+
+        final class MappedByteBufferFactory implements FlatBufferBuilder.ByteBufferFactory {
+            @Override
+            public ByteBuffer newByteBuffer(int capacity) {
+                ByteBuffer bb;
+                try {
+                    bb =  new RandomAccessFile("/tmp/bx/routes/buffer.tmp", "rw").getChannel().map(FileChannel.MapMode.READ_WRITE, 0, capacity).order(ByteOrder.LITTLE_ENDIAN);
+                } catch(Throwable e) {
+                    System.out.println("Failed to map ByteBuffer to a file");
+                    bb = null;
+                }
+                return bb;
+            }
+        }
+        FlatBufferBuilder fbb = new FlatBufferBuilder(1024*1024*1024, new MappedByteBufferFactory());
+        boolean sizePrefix = false;
+
+        buildRoutesFromCsv(fbb, sizePrefix, "/tmp/bx/routes/sorted_routes.csv");
+
+        // Test it:
+        ByteBuffer dataBuffer = fbb.dataBuffer();
+        System.out.println("bx:dataBuffer.position:" + dataBuffer.position());
+        System.out.println("bx:dataBuffer.limit:" + dataBuffer.limit());
+
+        System.out.println("bx:sizePrefix:" + sizePrefix);
+        System.out.println("bx:SIZE_PREFIX_LENGTH:" + SIZE_PREFIX_LENGTH);
+        int totalSize = dataBuffer.remaining();
+        System.out.println("bx:dataBuffer.totalSize:" + totalSize);
+        System.out.println("bx:dataBuffer.isDirect:" + dataBuffer.isDirect());
+        System.out.println("bx:dataBuffer.position:" + dataBuffer.position());
+        System.out.println("bx:dataBuffer.limit:" + dataBuffer.limit());
+
+
+        final File path = new File("/tmp/bx/routes");
+        final Env<ByteBuffer> env = create()
+            .setMapSize(1024*1024*1024)
+            .setMaxDbs(4)
+            .open(path);
+        System.out.println("bx:env:open:" + env.info());
+
+        final Dbi<ByteBuffer> db = env.openDbi("routesByOrigin", MDB_CREATE);
+        System.out.println("bx:maxKeySize:" + env.getMaxKeySize());
+
+        // final ByteBuffer key = allocateDirect(env.getMaxKeySize());
+        // key.put("routes.1".getBytes(StandardCharsets.UTF_8)).flip();
+        final ByteBuf key = ByteBufAllocator.DEFAULT.directBuffer(env.getMaxKeySize());
+        ByteBufUtil.writeUtf8(key, "routes.1");
+
+        db.put(key.nioBuffer(), dataBuffer);
+
+        key.release();
+
+        System.out.println("bx:env:closing:" + env.info());
+        env.close();
+
+        System.out.println("Writing flatbuffers to MDB: completed successfully");
+    }
 
 }
