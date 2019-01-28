@@ -424,22 +424,21 @@ public class BxRoutesTest {
         System.out.println("Writing flatbuffers to MDB: completed successfully");
     }
 
-    @Test
-    public void testReadValueAsFlatBuffer() throws IOException, InterruptedException {
+    // @Test
+    public void testReadValueAsFlatBuffer(String folder) throws IOException, InterruptedException {
 
         System.out.println("Native memory used: " + sun.misc.SharedSecrets.getJavaNioAccess().getDirectBufferPool().getMemoryUsed());
         System.out.println("Max direct memory: " + sun.misc.VM.maxDirectMemory());
         System.out.println("bx:env:opening");
-        // Thread.sleep(60000);
+        Thread.sleep(60000);
 
-        final File path = new File("/tmp/bx/routes");
+        final File path = new File(folder);
         final Env<ByteBuffer> env = create()
             .setMapSize(5L*1024*1024*1024)  // 2GB
             .setMaxDbs(4)
             .open(path);
 
         System.out.println("bx:env:open:" + env.info());
-        // Thread.sleep(60000);
 
         final Dbi<ByteBuffer> db = env.openDbi("routesByOrigin");
 
@@ -637,6 +636,14 @@ public class BxRoutesTest {
         env.close();
 
         System.out.println("Writing flatbuffers to MDB: completed successfully");
+    }
+
+    @Test
+    public void testReadValueAsFlatBufferInMultipleRounds() throws IOException, InterruptedException {
+        for (int i = 1; i <= 100; i++) {
+            System.out.println("Reading: " + i);
+            testReadValueAsFlatBuffer("/tmp/bx/routes/" + i);
+        }
     }
 
 }
