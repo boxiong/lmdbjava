@@ -358,7 +358,7 @@ public class BxRoutesTest {
         int numOfRoutes = root.routesLength();
         System.out.println("bx:routesLength:" + numOfRoutes);
         for (int i = 0; i < numOfRoutes; i++) {
-            if (i % 10_000 == 0) {
+            if (i % 100_000 == 0) {
               displayRoute(root.routes(i));
             }
         }
@@ -427,14 +427,19 @@ public class BxRoutesTest {
     @Test
     public void testReadValueAsFlatBuffer() throws IOException, InterruptedException {
 
+        System.out.println("Native memory used: " + sun.misc.SharedSecrets.getJavaNioAccess().getDirectBufferPool().getMemoryUsed());
+        System.out.println("Max direct memory: " + sun.misc.VM.maxDirectMemory());
+        System.out.println("bx:env:opening");
+        // Thread.sleep(60000);
+
         final File path = new File("/tmp/bx/routes");
         final Env<ByteBuffer> env = create()
-            .setMapSize(2L*1024*1024*1024)  // 2GB
+            .setMapSize(5L*1024*1024*1024)  // 2GB
             .setMaxDbs(4)
             .open(path);
 
         System.out.println("bx:env:open:" + env.info());
-        Thread.sleep(60000);
+        // Thread.sleep(60000);
 
         final Dbi<ByteBuffer> db = env.openDbi("routesByOrigin");
 
@@ -474,12 +479,6 @@ public class BxRoutesTest {
             }
         }
 
-        key.release();
-        System.out.println("bx:env:closing:" + env.info());
-        Thread.sleep(60000);
-        env.close();
-        System.out.println("bx:env:closed");
-        Thread.sleep(60000);
 
                 System.out.println("bx:dataBuffer.Long.BYTES:" + Long.BYTES);
                 System.out.println("bx:dataBuffer.Long.BYTES*2:" + Long.BYTES * 2);
@@ -487,6 +486,20 @@ public class BxRoutesTest {
                 System.out.println("bx:dataBuffer.isDirect:" + dataBuffer.isDirect());
                 System.out.println("bx:dataBuffer.position:" + dataBuffer.position());
                 System.out.println("bx:dataBuffer.limit:" + dataBuffer.limit());
+
+        key.release();
+        System.out.println("bx:env:closing:" + env.info());
+        System.out.println("Native memory used: " + sun.misc.SharedSecrets.getJavaNioAccess().getDirectBufferPool().getMemoryUsed());
+        System.out.println("Max direct memory: " + sun.misc.VM.maxDirectMemory());
+        Thread.sleep(60000);
+
+
+        env.close();
+        System.out.println("bx:env:closed");
+        Thread.sleep(60000);
+
+        System.out.println("Native memory used: " + sun.misc.SharedSecrets.getJavaNioAccess().getDirectBufferPool().getMemoryUsed());
+        System.out.println("Max direct memory: " + sun.misc.VM.maxDirectMemory());
 
         System.out.println("Reading flatbuffers from MDB: completed successfully");
     }
